@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>重ね合わせ画像表示</title>
+    <style>
+        #imageContainer {
+            position: relative;
+            width: 500px;
+            height: 500px;
+        }
+        #topImage, #bottomImage {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #topImage {
+            z-index: 1;
+        }
+    </style>
+</head>
+<body>
+    <h1>重ね合わせ画像表示</h1>
+    <form id="imageForm">
+        <input type="url" id="topImageUrl" placeholder="上層画像のURL" required>
+        <input type="url" id="bottomImageUrl" placeholder="下層画像のURL" required>
+        <button type="submit">画像を表示</button>
+    </form>
+    <div id="imageContainer">
+        <img id="bottomImage" alt="下層画像">
+        <canvas id="topImage"></canvas>
+    </div>
+
+    <script>
+        const form = document.getElementById('imageForm');
+        const imageContainer = document.getElementById('imageContainer');
+        const topImage = document.getElementById('topImage');
+        const bottomImage = document.getElementById('bottomImage');
+
+form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const topImageUrl = document.getElementById('topImageUrl').value;
+    const bottomImageUrl = document.getElementById('bottomImageUrl').value;
+
+    try {
+        const response = await fetch('/process-images', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topImageUrl, bottomImageUrl })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`画像の処理に失敗しました: ${errorData.details || response.statusText}`);
+        }
+
+        const { topImage: topImageData, bottomImage: bottomImageData } = await response.json();
+
+        bottomImage.src = bottomImageData;
+        const ctx = topImage.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+            topImage.width = img.width;
+            topImage.height = img.height;
+            ctx.drawImage(img, 0, 0);
+        };
+        img.src = topImageData;
+
+        setupClickHandler();
+    } catch (error) {
+        console.error('詳細なエラー:', error);
+        alert(`画像の処理中にエラーが発生しました: ${error.message}`);
+    }
+});
+
+        function setupClickHandler() {
+            const ctx = topImage.getContext('2d');
+            topImage.addEventListener('click', (e) => {
+                const rect = topImage.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x, y, 20, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+    </script>
+</body>
+</html>
